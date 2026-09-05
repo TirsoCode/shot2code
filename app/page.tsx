@@ -59,7 +59,7 @@ export default function Home() {
 
       <header className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2 font-mono font-bold text-lg">
-          <span className="bg-white text-black px-1.5 py-0.5 rounded text-sm">&lt;/&gt;</span> Shot2Code
+          Shot2Code
         </div>
         <nav className="hidden md:flex gap-6 text-sm text-neutral-400">
           <a href="#" className="hover:text-white">Ejemplos</a>
@@ -70,7 +70,7 @@ export default function Home() {
 
       <section className="max-w-6xl mx-auto px-6 text-center mt-8">
         <div className="inline-flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-full px-3 py-1 text-xs text-neutral-400">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> Gratis y open-source
+          Gratis y open-source
         </div>
         <h1 className="text-4xl md:text-6xl font-bold tracking-tight mt-4">
           Pega tu captura.<br /> <span className="text-neutral-500">Obtén el código.</span>
@@ -92,7 +92,6 @@ export default function Home() {
               <img src={img} alt="preview" className="max-h-64 rounded-lg shadow" />
             ) : (
               <>
-                <div className="w-12 h-12 rounded-xl bg-neutral-800 flex items-center justify-center text-xl mb-3">🖼️</div>
                 <p className="font-medium">Arrastra y suelta tu captura aquí</p>
                 <p className="text-xs text-neutral-500 mt-1">PNG, JPG, WebP — o pega con Ctrl+V</p>
               </>
@@ -128,7 +127,7 @@ export default function Home() {
             disabled={loading}
             className="mt-6 w-full bg-white text-black py-3 rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? "Generando..." : "Generar código →"}
+            {loading ? "Generando..." : "Generar código"}
           </button>
           {error && <p className="text-red-400 text-sm mt-3 text-center">{error}</p>}
           <p className="text-[11px] text-neutral-500 text-center mt-3">Modelo gratis: Gemini Flash + fallback open-source</p>
@@ -138,8 +137,7 @@ export default function Home() {
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden flex flex-col min-h-[500px]">
           <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-[#0a0a0a]">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 bg-red-500 rounded-full" /> <span className="w-3 h-3 bg-yellow-500 rounded-full" /> <span className="w-3 h-3 bg-green-500 rounded-full" />
-              <span className="ml-3 text-xs text-neutral-500 font-mono">preview</span>
+              <span className="text-xs text-neutral-500 font-mono">preview</span>
             </div>
             <div className="flex gap-2">
               <button onClick={() => code && navigator.clipboard.writeText(code)} className="text-xs bg-white text-black px-3 py-1.5 rounded-full font-medium">Copiar</button>
@@ -149,7 +147,6 @@ export default function Home() {
 
           {!code ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-neutral-500">
-              <div className="text-3xl mb-3">{"</>"}</div>
               <p className="text-sm">El código aparecerá aquí</p>
               <p className="text-xs mt-1">Split: preview a la izquierda, código a la derecha</p>
             </div>
