@@ -10,6 +10,59 @@ const PROMPTS: Record<string, string> = {
   vue: "Eres un experto en Vue 3 + Tailwind. Convierte la captura en un SFC Vue (<template><script setup>). Devuelve SOLO código Vue, sin explicaciones.",
 };
 
+async function callOpenRouter(image: string, prompt: string) {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error("Falta OPENROUTER_API_KEY");
+  // Modelo visión barato y bueno via OpenRouter
+  const model = process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-001";
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://github.com/TirsoCode/shot2code",
+      "X-Title": "Shot2Code",
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: image } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenRouter ${res.status}: ${err.slice(0,300)}`);
+  }
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  return text.replace(/^```(html|tsx|vue)?\n?/, "").replace(/```$/, "").trim();
+}
+
+async function callGemini(image: string, prompt: string) {
+  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!key) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
+  const { text } = await generateText({
+    model: google("gemini-2.0-flash"),
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image", image: image as string },
+        ],
+      },
+    ],
+  });
+  return text.replace(/^```(html|tsx|vue)?\n?/, "").replace(/```$/, "").trim();
+}
+
 export async function POST(req: Request) {
   try {
     const { image, format } = await req.json();
@@ -17,34 +70,19 @@ export async function POST(req: Request) {
     const f = (format as string) || "html-tailwind";
     const prompt = PROMPTS[f] || PROMPTS["html-tailwind"];
 
-    // Intento 1: Gemini Flash (gratis)
+    // Intento 1: OpenRouter (tu key sk-or-v1-...)
     try {
-      const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-      if (!apiKey) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
-      const { text } = await generateText({
-        model: google("gemini-2.0-flash"),
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { type: "image", image: image as string },
-            ],
-          },
-        ],
-      });
-      const code = text.replace(/^```(html|tsx|vue)?\n?/, "").replace(/```$/, "").trim();
-      return Response.json({ code });
+      const code = await callOpenRouter(image, prompt);
+      return Response.json({ code, provider: "openrouter" });
     } catch (e: any) {
-      console.error("Gemini fallo, probando fallback:", e.message);
-      // Fallback open-source: puedes conectar HuggingFace Inference aquí
-      // Ejemplo con HF: https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf
-      // Por ahora devolvemos error amigable para que configures HF_TOKEN
-      if (process.env.HF_TOKEN) {
-        // Aquí iría fetch a HF — placeholder
-        return Response.json({ error: "Gemini sin cuota, activa HF_TOKEN para fallback open-source. Error: " + e.message }, { status: 429 });
+      console.error("OpenRouter fallo, probando Gemini fallback:", e.message);
+      // Intento 2: Gemini directo (AQ.Ab8...)
+      try {
+        const code = await callGemini(image, prompt);
+        return Response.json({ code, provider: "gemini" });
+      } catch (e2: any) {
+        return Response.json({ error: `OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}` }, { status: 500 });
       }
-      throw e;
     }
   } catch (e: any) {
     return Response.json({ error: e.message || "Error generando código" }, { status: 500 });
