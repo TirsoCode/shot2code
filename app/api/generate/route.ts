@@ -3,18 +3,28 @@ import { generateText } from "ai";
 
 export const maxDuration = 30;
 
-const PROMPTS: Record<string, string> = {
-  html: "Eres un experto maquetador HTML/CSS. Convierte la captura en HTML + CSS puro (sin Tailwind). Devuelve SOLO código HTML completo y limpio, sin explicaciones, sin markdown.",
-  "html-tailwind": "Eres un experto en HTML + Tailwind CSS. Convierte la captura en HTML usando Tailwind CDN (añade <script src='https://cdn.tailwindcss.com'></script> si hace falta). Devuelve SOLO código HTML completo, sin explicaciones, sin markdown. Pixel-perfect, responsive.",
-  react: "Eres un experto en React + Tailwind. Convierte la captura en un componente React funcional (export default function). Usa Tailwind. Devuelve SOLO código TSX, sin explicaciones, sin markdown.",
-  vue: "Eres un experto en Vue 3 + Tailwind. Convierte la captura en un SFC Vue (<template><script setup>). Devuelve SOLO código Vue, sin explicaciones.",
+type StackId = "html" | "html-tailwind" | "react" | "vue" | "bootstrap" | "ionic";
+
+const PROMPTS: Record<StackId, string> = {
+  html:
+    "Eres un experto maquetador HTML/CSS. Convierte esta captura en HTML + CSS puro (sin framework). Usa flexbox, colores, tipografía y espaciados fieles al diseño. Devuelve SOLO código HTML completo, sin explicaciones, sin markdown.",
+  "html-tailwind":
+    "Eres un experto en HTML + Tailwind CSS. Convierte la captura en HTML usando Tailwind CDN. Devuelve SOLO código HTML completo, sin explicaciones, sin markdown. Pixel-perfect, responsive.",
+  react:
+    "Eres un experto en React + Tailwind. Convierte la captura en un componente React funcional (export default function). Usa Tailwind para estilos. Devuelve SOLO código TSX, sin explicaciones, sin markdown.",
+  vue:
+    "Eres un experto en Vue 3 + Tailwind. Convierte la captura en un SFC Vue (<template><script setup lang='ts'>). Usa Tailwind. Devuelve SOLO código Vue, sin explicaciones, sin markdown.",
+  bootstrap:
+    "Eres un experto en HTML + Bootstrap 5. Convierte la captura en HTML usando Bootstrap 5 CDN (botones, cards, grid, forms, etc). Devuelve SOLO código HTML completo, sin explicaciones, sin markdown.",
+  ionic:
+    "Eres un experto en Ionic Framework + Tailwind. Convierte la captura en componentes Ionic (ion-header, ion-content, ion-card, etc). Devuelve SOLO código TSX para React+Ionic, sin explicaciones, sin markdown.",
 };
 
-async function callOpenRouter(image: string, prompt: string) {
+async function callOpenRouter(image: string, prompt: string, textPrompt: string) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("Falta OPENROUTER_API_KEY");
-  // Modelo visión barato y bueno via OpenRouter
   const model = process.env.OPENROUTER_MODEL || "google/gemini-2.0-flash-001";
+  const fullPrompt = textPrompt ? `${prompt}\n\nInstrucciones adicionales del usuario: ${textPrompt}` : prompt;
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -29,32 +39,32 @@ async function callOpenRouter(image: string, prompt: string) {
         {
           role: "user",
           content: [
-            { type: "text", text: prompt },
+            { type: "text", text: fullPrompt },
             { type: "image_url", image_url: { url: image } },
           ],
         },
       ],
     }),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${err.slice(0,300)}`);
-  }
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  return text.replace(/^```(html|tsx|vue)?\n?/, "").replace(/```$/, "").trim();
+  return (data.choices?.[0]?.message?.content || "")
+    .replace(/^```(html|tsx|vue)?\n?/, "")
+    .replace(/```$/, "")
+    .trim();
 }
 
-async function callGemini(image: string, prompt: string) {
+async function callGemini(image: string, prompt: string, textPrompt: string) {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
+  const fullPrompt = textPrompt ? `${prompt}\n\nInstrucciones adicionales: ${textPrompt}` : prompt;
   const { text } = await generateText({
     model: google("gemini-2.0-flash"),
     messages: [
       {
         role: "user",
         content: [
-          { type: "text", text: prompt },
+          { type: "text", text: fullPrompt },
           { type: "image", image: image as string },
         ],
       },
@@ -65,23 +75,26 @@ async function callGemini(image: string, prompt: string) {
 
 export async function POST(req: Request) {
   try {
-    const { image, format } = await req.json();
+    const { image, stack, textPrompt } = await req.json();
     if (!image) return Response.json({ error: "Falta imagen" }, { status: 400 });
-    const f = (format as string) || "html-tailwind";
-    const prompt = PROMPTS[f] || PROMPTS["html-tailwind"];
+    const s = ((stack as string) || "html-tailwind") as StackId;
+    const prompt = PROMPTS[s] || PROMPTS["html-tailwind"];
 
-    // Intento 1: OpenRouter (tu key sk-or-v1-...)
+    // Intento 1: OpenRouter
     try {
-      const code = await callOpenRouter(image, prompt);
+      const code = await callOpenRouter(image, prompt, textPrompt || "");
       return Response.json({ code, provider: "openrouter" });
     } catch (e: any) {
-      console.error("OpenRouter fallo, probando Gemini fallback:", e.message);
-      // Intento 2: Gemini directo (AQ.Ab8...)
+      console.error("OpenRouter fallo, fallback Gemini:", e.message);
+      // Intento 2: Gemini
       try {
-        const code = await callGemini(image, prompt);
+        const code = await callGemini(image, prompt, textPrompt || "");
         return Response.json({ code, provider: "gemini" });
       } catch (e2: any) {
-        return Response.json({ error: `OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}` }, { status: 500 });
+        return Response.json(
+          { error: `OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}` },
+          { status: 500 }
+        );
       }
     }
   } catch (e: any) {
