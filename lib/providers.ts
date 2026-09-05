@@ -8,7 +8,7 @@ export interface GenInput {
 }
 
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OR_MODEL = "google/gemini-2.0-flash-001";
+const DEFAULT_OR_MODEL = "google/gemini-2.0-flash";
 
 function orHeaders(): Record<string, string> {
   const key = process.env.OPENROUTER_API_KEY;
@@ -75,7 +75,7 @@ export async function geminiOnce(input: GenInput): Promise<string> {
   const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   if (!key) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
   const { text } = await generateText({
-    model: google("gemini-2.0-flash"),
+    model: google("gemini-3.0-flash"),
     messages: geminiMessages(input) as any,
   });
   return cleanupCode(text);
