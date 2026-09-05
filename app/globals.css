@@ -1,3 +1,144 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #07090c;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(113, 113, 122, 0.45) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.35);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.6);
+}
+
+.font-mono,
+.font-mono * {
+  font-variant-ligatures: none;
+}
+
+/* Untransparent-Caret trick: keep the text transparent but the caret visible */
+.editor-textarea {
+  -webkit-text-fill-color: transparent;
+}
+.editor-textarea::placeholder {
+  -webkit-text-fill-color: #52525b;
+}
+
+/* Aurora background (inspirado en la web de abi/screenshot-to-code) */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 55vw;
+  height: 55vw;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.5;
+}
+
+.aurora::before {
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle at 30% 40%, rgba(79, 70, 229, 0.55), rgba(37, 99, 235, 0.28) 45%, transparent 70%);
+  animation: aurora-drift-a 26s ease-in-out infinite alternate;
+}
+
+.aurora::after {
+  bottom: -18%;
+  right: -10%;
+  background: radial-gradient(circle at 60% 50%, rgba(34, 211, 238, 0.4), rgba(59, 130, 246, 0.2) 50%, transparent 72%);
+  animation: aurora-drift-b 32s ease-in-out infinite alternate;
+}
+
+.aurora-glow {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  width: 40vw;
+  height: 40vw;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.18), transparent 65%);
+  animation: aurora-drift-a 38s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes aurora-drift-a {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4vw, 2vw, 0) scale(1.12);
+  }
+  100% {
+    transform: translate3d(-3vw, 4vw, 0) scale(0.96);
+  }
+}
+
+@keyframes aurora-drift-b {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-5vw, -3vw, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(3vw, -4vw, 0) scale(0.94);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after,
+  .aurora-glow {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Skeleton pulse luces para estados de carga */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.05;
+  }
+}
+
+.skeleton-pulse {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
