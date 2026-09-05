@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Shot2Code — Captura a Código",
-  description: "Sube una captura y obtén HTML/React instantáneo. Gratis, open-source.",
+  description: "Sube una captura y obtén HTML/React instantáneo.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Adsterra - pega tu código aquí */}
         {/* <script async src="https://...adsterra..."></script> */}
       </head>
-      <body className="bg-[#0a0a0a] text-white antialiased">{children}</body>
+      <body className="bg-white text-gray-900 antialiased font-sans">{children}</body>
     </html>
   );
 }
