@@ -75,28 +75,34 @@ async function callGemini(image: string, prompt: string, textPrompt: string) {
 
 export async function POST(req: Request) {
   try {
-    const { image, stack, textPrompt } = await req.json();
+    const { image, stack, textPrompt, variants = 1 } = await req.json();
     if (!image) return Response.json({ error: "Falta imagen" }, { status: 400 });
     const s = ((stack as string) || "html-tailwind") as StackId;
     const prompt = PROMPTS[s] || PROMPTS["html-tailwind"];
+    const count = Math.min(Math.max(Number(variants) || 1, 1), 2);
 
-    // Intento 1: OpenRouter
-    try {
-      const code = await callOpenRouter(image, prompt, textPrompt || "");
-      return Response.json({ code, provider: "openrouter" });
-    } catch (e: any) {
-      console.error("OpenRouter fallo, fallback Gemini:", e.message);
-      // Intento 2: Gemini
+    const runOnce = async (): Promise<{ code: string; provider: string }> => {
+      // Intento 1: OpenRouter
       try {
-        const code = await callGemini(image, prompt, textPrompt || "");
-        return Response.json({ code, provider: "gemini" });
-      } catch (e2: any) {
-        return Response.json(
-          { error: `OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}` },
-          { status: 500 }
-        );
+        const code = await callOpenRouter(image, prompt, textPrompt || "");
+        return { code, provider: "openrouter" };
+      } catch (e: any) {
+        console.error("OpenRouter fallo, fallback Gemini:", e.message);
+        // Intento 2: Gemini
+        try {
+          const code = await callGemini(image, prompt, textPrompt || "");
+          return { code, provider: "gemini" };
+        } catch (e2: any) {
+          throw new Error(`OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}`);
+        }
       }
-    }
+    };
+
+    const results = await Promise.all(Array.from({ length: count }, () => runOnce()));
+    return Response.json({
+      codes: results.map((r) => r.code),
+      provider: results[0]?.provider,
+    });
   } catch (e: any) {
     return Response.json({ error: e.message || "Error generando código" }, { status: 500 });
   }
