@@ -177,13 +177,36 @@ export default function Tool() {
       setSelectMode(false);
     }
 
-    const parts: string[] = [];
+    const parts: Record<number, string> = {};
     const doneIdx: number[] = [];
     let lastProvider = "";
     const ac = new AbortController();
     acRef.current = ac;
 
+    let flushTimer: ReturnType<typeof setInterval> | null = null;
+    const pendingFlush = { code: false, variants: false };
+
+    const flushPending = () => {
+      if (pendingFlush.code) {
+        const c = parts[0] || "";
+        setCode(c);
+        pendingFlush.code = false;
+      }
+      if (pendingFlush.variants) {
+        setVersions((prev) =>
+          prev.map((x) => {
+            if (x.id !== vid) return x;
+            const newVars = Array.from({ length: variantCount }, (_, i) => parts[i] || "");
+            return { ...x, variants: newVars };
+          })
+        );
+        pendingFlush.variants = false;
+      }
+    };
+
     const finalize = () => {
+      if (flushTimer) { clearInterval(flushTimer); flushTimer = null; }
+      flushPending();
       const finalVariants = Array.from({ length: variantCount }, (_, i) => parts[i] || "");
       const okIdx = doneIdx.length ? doneIdx[0] : finalVariants.findIndex((c) => c.trim() !== "");
       const pick = okIdx >= 0 ? okIdx : 0;
@@ -215,6 +238,9 @@ export default function Tool() {
         finalize();
         return;
       }
+
+      flushTimer = setInterval(flushPending, 150);
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
@@ -235,15 +261,11 @@ export default function Tool() {
           if (ev.type === "status") setStatusMsg(ev.text);
           else if (ev.type === "token") {
             parts[ev.variant] = (parts[ev.variant] || "") + ev.text;
-            if (ev.variant === 0) setCode(parts[ev.variant]);
-            setVersions((prev) =>
-              prev.map((x) =>
-                x.id === vid ? { ...x, variants: setVarAt(x, ev.variant, parts[ev.variant]) } : x
-              )
-            );
+            if (ev.variant === 0) pendingFlush.code = true;
+            pendingFlush.variants = true;
           } else if (ev.type === "variant_done") {
             parts[ev.variant] = ev.code;
-            if (ev.variant === 0) setCode(ev.code);
+            if (ev.variant === 0) { setCode(ev.code); }
             lastProvider = ev.provider || lastProvider;
             doneIdx.push(ev.variant);
             setVersions((prev) =>

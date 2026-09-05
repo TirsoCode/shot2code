@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef } from "react";
+import { memo, useMemo, useRef } from "react";
 
 interface Props {
   value: string;
@@ -11,23 +11,19 @@ interface Props {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 type TokenType = "comment" | "tag" | "attr" | "string" | "plain";
-interface Token {
-  type: TokenType;
-  value: string;
-}
 
 const COLORS: Record<TokenType, string> = {
-  plain: "#d4d4d8",
-  comment: "#71717a",
-  tag: "#7dd3fc",
+  plain: "#94a3b8",
+  comment: "#64748b",
+  tag: "#38bdf8",
   attr: "#fbbf24",
-  string: "#86efac",
+  string: "#4ade80",
 };
 
 const TOKEN_RE = /<!--[\s\S]*?-->|<\/?[A-Za-z][\w-]*|[\w-]+(?==)|"[^"]*"|'[^']*'/g;
 
-function tokenize(src: string): Token[] {
-  const tokens: Token[] = [];
+function tokenize(src: string): Array<{ type: TokenType; value: string }> {
+  const tokens: Array<{ type: TokenType; value: string }> = [];
   let last = 0;
   let m: RegExpExecArray | null;
   TOKEN_RE.lastIndex = 0;
@@ -45,6 +41,7 @@ function tokenize(src: string): Token[] {
 }
 
 function highlight(src: string): string {
+  if (!src) return "";
   return tokenize(src)
     .map((t) => {
       if (t.type === "plain") return esc(t.value);
@@ -56,7 +53,7 @@ function highlight(src: string): string {
     .join("");
 }
 
-export default function CodeEditor({ value, onChange, readOnly, placeholder }: Props) {
+function CodeEditor({ value, onChange, readOnly, placeholder }: Props) {
   const highlighted = useMemo(() => highlight(value), [value]);
   const gutterRef = useRef<HTMLDivElement>(null);
   const hlRef = useRef<HTMLPreElement>(null);
@@ -72,10 +69,10 @@ export default function CodeEditor({ value, onChange, readOnly, placeholder }: P
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[#0a0c0f] text-[12.5px] leading-[1.6]">
+    <div className="flex h-full w-full overflow-hidden bg-[#1e1e2e] text-[12.5px] leading-[1.6]">
       <div
         ref={gutterRef}
-        className="w-11 shrink-0 select-none overflow-hidden border-r border-white/5 bg-black/30 px-2 py-3 text-right font-mono text-[#3f3f46]"
+        className="w-11 shrink-0 select-none overflow-hidden border-r border-white/5 bg-[#13131a] px-2 py-3 text-right font-mono text-[#3f3f46]"
       >
         {lines.map((n) => (
           <div key={n}>{n}</div>
@@ -85,9 +82,9 @@ export default function CodeEditor({ value, onChange, readOnly, placeholder }: P
         <pre
           ref={hlRef}
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 font-mono text-[#d4d4d8]"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 font-mono text-[#cdd6f4]"
           style={{ overflowWrap: "break-word", wordBreak: "break-word" }}
-          dangerouslySetInnerHTML={{ __html: highlighted + (value ? "" : "\n") }}
+          dangerouslySetInnerHTML={{ __html: highlighted || "&nbsp;" }}
         />
         <textarea
           value={value}
@@ -97,10 +94,12 @@ export default function CodeEditor({ value, onChange, readOnly, placeholder }: P
           spellCheck={false}
           aria-label="Editor de código"
           placeholder={placeholder}
-          className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre-wrap break-words bg-transparent px-4 py-3 font-mono text-transparent caret-sky-300 outline-none placeholder:text-[#52525b]"
+          className="absolute inset-0 h-full w-full resize-none overflow-auto whitespace-pre-wrap break-words bg-transparent px-4 py-3 font-mono text-transparent caret-sky-300 outline-none placeholder:text-[#45475a]"
           style={{ overflowWrap: "break-word", wordBreak: "break-word" }}
         />
       </div>
     </div>
   );
 }
+
+export default memo(CodeEditor);
