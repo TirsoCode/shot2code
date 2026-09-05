@@ -51,14 +51,25 @@ code, pre, .font-code {
 :root {
   --bg: #ffffff;
   --bg-2: #f8f9fa;
+  --bg-3: #f3f4f6;
+  --surface: #ffffff;
+  --surface-2: #f8f9fa;
   --border: #e5e7eb;
   --border-strong: #d1d5db;
+  --text: #111827;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
   --text: #111827;
   --text-2: #4b5563;
   --text-3: #9ca3af;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
   --accent-light: #eff6ff;
+}
+
+body {
+  background: var(--bg-2);
 }
 
 /* Cards */
