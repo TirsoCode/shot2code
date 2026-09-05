@@ -4,3 +4,8 @@ node_modules
 .env
 .DS_Store
 .vercel
+
+# build cache
+build.log
+tsconfig.tsbuildinfo
+.next
