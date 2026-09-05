@@ -8,9 +8,14 @@ export interface GenInput {
 }
 
 const OR_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OR_MODEL = "google/gemini-2.0-flash";
 
-function orHeaders(): Record<string, string> {
+const OR_MODELS = [
+  "minimax/minimax-m3:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+];
+
+function orHeaders(model: string): Record<string, string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("Falta OPENROUTER_API_KEY");
   return {
@@ -19,10 +24,6 @@ function orHeaders(): Record<string, string> {
     "HTTP-Referer": "https://github.com/TirsoCode/shot2code",
     "X-Title": "Shot2Code",
   };
-}
-
-function orModel(): string {
-  return process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OR_MODEL;
 }
 
 function orMessages(input: GenInput): Array<{ role: string; content: any[] }> {
@@ -44,7 +45,7 @@ function geminiMessages(input: GenInput): Array<{ role: string; content: any[] }
   if (input.editHtml) {
     content.push({
       type: "text",
-      text: `CÓDIGO ACTUAL DEL ARCHIVO (modifícalo aplicando el cambio, manteniendo todo lo demás intacto):\n${input.editHtml}`,
+      text: `CÓDIGO ACTUAL DEL ARCHIVO:\n${input.editHtml}`,
     });
   }
   if (input.image) content.push({ type: "image", image: input.image });
@@ -59,11 +60,11 @@ function cleanupCode(raw: string): string {
   return s.trim();
 }
 
-export async function openRouterOnce(input: GenInput): Promise<string> {
+async function orFetch(input: GenInput, model: string): Promise<string> {
   const res = await fetch(OR_URL, {
     method: "POST",
-    headers: orHeaders(),
-    body: JSON.stringify({ model: orModel(), messages: orMessages(input), stream: false }),
+    headers: orHeaders(model),
+    body: JSON.stringify({ model, messages: orMessages(input), stream: false }),
   });
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = await res.json();
@@ -71,38 +72,15 @@ export async function openRouterOnce(input: GenInput): Promise<string> {
   return cleanupCode(typeof content === "string" ? content : JSON.stringify(content));
 }
 
-export async function geminiOnce(input: GenInput): Promise<string> {
-  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!key) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
-  const { text } = await generateText({
-    model: google("gemini-3.0-flash"),
-    messages: geminiMessages(input) as any,
-  });
-  return cleanupCode(text);
-}
-
-export async function resolveOnce(input: GenInput): Promise<{ code: string; provider: string }> {
-  try {
-    const code = await openRouterOnce(input);
-    return { code, provider: "openrouter" };
-  } catch (e: any) {
-    console.error("OpenRouter falló, fallback Gemini:", e.message);
-    try {
-      return { code: await geminiOnce(input), provider: "gemini" };
-    } catch (e2: any) {
-      throw new Error(`OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}`);
-    }
-  }
-}
-
-export async function openRouterStream(
+async function orStreamFetch(
   input: GenInput,
+  model: string,
   onToken: (t: string) => void
 ): Promise<string> {
   const res = await fetch(OR_URL, {
     method: "POST",
-    headers: orHeaders(),
-    body: JSON.stringify({ model: orModel(), messages: orMessages(input), stream: true }),
+    headers: orHeaders(model),
+    body: JSON.stringify({ model, messages: orMessages(input), stream: true }),
   });
   if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const reader = res.body?.getReader();
@@ -122,19 +100,64 @@ export async function openRouterStream(
       const data = line.slice(5).trim();
       if (!data || data === "[DONE]") continue;
       let json: any;
-      try {
-        json = JSON.parse(data);
-      } catch {
-        continue;
-      }
+      try { json = JSON.parse(data); } catch { continue; }
       const delta = json?.choices?.[0]?.delta?.content;
-      if (typeof delta === "string" && delta) {
-        full += delta;
-        onToken(delta);
-      }
+      if (typeof delta === "string" && delta) { full += delta; onToken(delta); }
     }
   }
   return cleanupCode(full);
+}
+
+export async function openRouterOnce(input: GenInput): Promise<string> {
+  let lastErr = "";
+  for (const model of OR_MODELS) {
+    try {
+      return await orFetch(input, model);
+    } catch (e: any) {
+      lastErr = e.message;
+      console.error(`OpenRouter modelo ${model} falló:`, lastErr);
+    }
+  }
+  throw new Error(`Todos los modelos OpenRouter fallaron: ${lastErr}`);
+}
+
+export async function geminiOnce(input: GenInput): Promise<string> {
+  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!key) throw new Error("Falta GOOGLE_GENERATIVE_AI_API_KEY");
+  const { text } = await generateText({
+    model: google("gemini-1.5-flash"),
+    messages: geminiMessages(input) as any,
+  });
+  return cleanupCode(text);
+}
+
+export async function resolveOnce(input: GenInput): Promise<{ code: string; provider: string }> {
+  try {
+    return { code: await openRouterOnce(input), provider: "openrouter" };
+  } catch (e: any) {
+    console.error("OpenRouter falló, usando Gemini directo:", e.message);
+    try {
+      return { code: await geminiOnce(input), provider: "gemini" };
+    } catch (e2: any) {
+      throw new Error(`OpenRouter y Gemini fallaron: ${e.message} | ${e2.message}`);
+    }
+  }
+}
+
+export async function openRouterStream(
+  input: GenInput,
+  onToken: (t: string) => void
+): Promise<string> {
+  let lastErr = "";
+  for (const model of OR_MODELS) {
+    try {
+      return await orStreamFetch(input, model, onToken);
+    } catch (e: any) {
+      lastErr = e.message;
+      console.error(`OpenRouter stream modelo ${model} falló:`, lastErr);
+    }
+  }
+  throw new Error(`Todos los modelos OpenRouter fallaron: ${lastErr}`);
 }
 
 export async function streamOnce(
@@ -143,10 +166,7 @@ export async function streamOnce(
 ): Promise<{ code: string; provider: string }> {
   let streamedAny = false;
   try {
-    const code = await openRouterStream(input, (t) => {
-      streamedAny = true;
-      onToken(t);
-    });
+    const code = await openRouterStream(input, (t) => { streamedAny = true; onToken(t); });
     return { code, provider: "openrouter" };
   } catch (e: any) {
     console.error("OpenRouter stream falló:", e.message);
