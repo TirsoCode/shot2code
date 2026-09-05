@@ -861,7 +861,7 @@ export default function Tool() {
       </div>
 
       <footer className="border-t border-[var(--border)] py-6 text-center text-xs text-[var(--text-muted)]">
-        Shot2Code · Anónimo · Sin base de datos · Open source
+        Shot2Code
       </footer>
 
       {/* History drawer */}
